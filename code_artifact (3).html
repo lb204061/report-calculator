@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>虛構報價與核准門檻計算機</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Inter & Noto Sans TC -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'Noto Sans TC', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', 'Noto Sans TC', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+    /* Custom subtle scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* 列印專用樣式：隱藏操作按鈕、測試抽屜與輸入框外觀，只保留清晰報價單與列表 */
+    @media print {
+      * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      header,
+      #qa-panel,
+      #active-case-banner,
+      .no-print {
+        display: none !important;
+      }
+      main {
+        max-width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      .print-only-header {
+        display: block !important;
+        margin-bottom: 16px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #0f172a;
+      }
+      .shadow-sm {
+        box-shadow: none !important;
+      }
+      .rounded-2xl,
+      .rounded-xl {
+        border-radius: 6px !important;
+      }
+      table {
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-100 selection:text-indigo-900">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-sm">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">虛構報價與核准門檻計算機</h1>
+          <p class="text-xs text-slate-500 hidden sm:block">Quote Engine & Approval Threshold Validator</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button
+          id="btn-print"
+          type="button"
+          class="px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition-colors flex items-center gap-1.5 shadow-xs"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          <span>列印報價單</span>
+        </button>
+        <button
+          id="btn-reset"
+          type="button"
+          class="px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+        >
+          重設預設值
+        </button>
+        <button
+          id="btn-toggle-qa"
+          type="button"
+          class="px-3.5 py-2 text-xs sm:text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition-colors flex items-center gap-1.5"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          <span>Q01–Q11 測試案例</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- QA Regression Test Drawer / Collapsible Bar -->
+  <section id="qa-panel" class="hidden bg-slate-900 text-slate-100 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <span class="px-2 py-0.5 text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-md">QA Suite</span>
+            回歸測試案例集 (Q01–Q11)
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">點擊任意案例即可自動帶入參數並驗證公式與門檻邏輯（含 Q10 與 Q11 門檻對照測試）。</p>
+        </div>
+        <button id="btn-close-qa" type="button" class="self-start sm:self-center text-xs text-slate-400 hover:text-white px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 transition">
+          收合面板 ✕
+        </button>
+      </div>
+
+      <div id="qa-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2.5">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <!-- 列印專用頁首（平時隱藏，列印時自動顯示） -->
+    <div class="print-only-header hidden">
+      <div class="flex items-baseline justify-between">
+        <h1 class="text-xl font-bold text-slate-900">虛構報價規則與核准門檻試算單</h1>
+        <span id="print-timestamp" class="text-xs text-slate-500"></span>
+      </div>
+      <p id="print-params-summary" class="text-xs text-slate-700 mt-1.5"></p>
+    </div>
+
+    <!-- Active Case Banner (shown when a QA preset is active) -->
+    <div id="active-case-banner" class="hidden mb-6 bg-indigo-50 border border-indigo-200 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="flex items-start sm:items-center gap-3">
+        <span id="active-case-badge" class="px-2.5 py-1 text-xs font-bold bg-indigo-600 text-white rounded-lg shrink-0">Q01</span>
+        <div>
+          <p id="active-case-title" class="text-sm font-semibold text-indigo-950"></p>
+          <p id="active-case-desc" class="text-xs text-indigo-700 mt-0.5"></p>
+        </div>
+      </div>
+      <button id="btn-clear-case" type="button" class="text-xs font-medium text-indigo-700 hover:text-indigo-900 underline self-end sm:self-center">
+        清除案例標記
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+      
+      <!-- LEFT COLUMN: Inputs (Quote Parameters + Decoupled Approval Threshold) -->
+      <div class="lg:col-span-5 space-y-6 no-print">
+        
+        <!-- Card 1: Quote Formula Inputs -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+          <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Step 1 · 報價參數</span>
+              <h2 class="text-base font-bold text-slate-900 mt-0.5">方案與計費條件</h2>
+            </div>
+            <span class="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">即時演算</span>
+          </div>
+
+          <div class="space-y-5">
+            <!-- Plan Tier Selection -->
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">
+                方案等級與月費 (NT$)
+              </label>
+              <div class="grid grid-cols-3 gap-2 mb-2.5" id="tier-buttons">
+                <button type="button" data-tier="basic" data-fee="30000" class="tier-btn p-3 rounded-xl border text-left transition-all">
+                  <div class="text-xs font-medium text-slate-500">基礎方案</div>
+                  <div class="text-sm font-bold text-slate-900 tabular-nums mt-0.5">30,000</div>
+                </button>
+                <button type="button" data-tier="pro" data-fee="60000" class="tier-btn p-3 rounded-xl border text-left transition-all">
+                  <div class="text-xs font-medium text-slate-500">進階方案</div>
+                  <div class="text-sm font-bold text-slate-900 tabular-nums mt-0.5">60,000</div>
+                </button>
+                <button type="button" data-tier="custom" data-fee="100000" class="tier-btn p-3 rounded-xl border text-left transition-all">
+                  <div class="text-xs font-medium text-slate-500">客製方案</div>
+                  <div class="text-sm font-bold text-slate-900 tabular-nums mt-0.5">100,000</div>
+                </button>
+              </div>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 text-sm font-medium">NT$</span>
+                <input
+                  id="input-fee"
+                  type="number"
+                  step="1"
+                  value="30000"
+                  placeholder="請輸入月費金額"
+                  class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-slate-900 tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                />
+              </div>
+              <p class="text-xs text-slate-500 mt-1.5">標準月費為 30,000 / 60,000 / 100,000；可手動修改以測試空值或負數邊界。</p>
+            </div>
+
+            <!-- Contract Period (Months) -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="input-months" class="block text-sm font-semibold text-slate-700">
+                  合約期間（月數）
+                </label>
+                <span class="text-xs text-slate-500">僅允許 3、6、12 個月</span>
+              </div>
+              <div class="grid grid-cols-4 gap-2">
+                <button type="button" data-months="3" class="month-btn py-2.5 px-3 rounded-xl border text-sm font-semibold tabular-nums transition-all">
+                  3 個月
+                </button>
+                <button type="button" data-months="6" class="month-btn py-2.5 px-3 rounded-xl border text-sm font-semibold tabular-nums transition-all">
+                  6 個月
+                </button>
+                <button type="button" data-months="12" class="month-btn py-2.5 px-3 rounded-xl border text-sm font-semibold tabular-nums transition-all">
+                  12 個月
+                </button>
+                <input
+                  id="input-months"
+                  type="number"
+                  step="1"
+                  value="12"
+                  placeholder="自訂"
+                  aria-label="合約月數輸入"
+                  class="py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-center text-slate-900 tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                />
+              </div>
+            </div>
+
+            <!-- Base Discount (0 - 30%) -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label for="input-discount" class="block text-sm font-semibold text-slate-700">
+                  基本折扣 (%)
+                </label>
+                <span class="text-xs text-slate-500">允許範圍：0% – 30%</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <input
+                  id="range-discount"
+                  type="range"
+                  min="0"
+                  max="30"
+                  step="1"
+                  value="0"
+                  class="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                />
+                <div class="relative w-28 shrink-0">
+                  <input
+                    id="input-discount"
+                    type="number"
+                    step="any"
+                    value="0"
+                    placeholder="0–30"
+                    class="w-full pl-3 pr-7 py-2 bg-slate-50 border border-slate-300 rounded-xl text-sm font-semibold text-right text-slate-900 tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition"
+                  />
+                  <span class="absolute inset-y-0 right-3 flex items-center text-slate-400 text-sm font-medium">%</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Frequency -->
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="block text-sm font-semibold text-slate-700">
+                  付款週期
+                </label>
+                <span id="annual-hint" class="text-xs text-indigo-600 font-medium">年付限 12 個月（享 ×0.97 優惠）</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2" id="freq-buttons">
+                <button type="button" data-freq="monthly" class="freq-btn p-2.5 rounded-xl border text-center transition-all">
+                  <div class="text-sm font-semibold">月付</div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">期數 = 月數</div>
+                </button>
+                <button type="button" data-freq="quarterly" class="freq-btn p-2.5 rounded-xl border text-center transition-all">
+                  <div class="text-sm font-semibold">季付</div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">期數 = 月數÷3</div>
+                </button>
+                <button type="button" data-freq="annual" class="freq-btn p-2.5 rounded-xl border text-center transition-all">
+                  <div class="text-sm font-semibold">年付</div>
+                  <div class="text-[11px] text-slate-500 mt-0.5">1 期 · 另乘 0.97</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Tax Toggle -->
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-2">
+                報價稅別基準（與核准門檻比對基準）
+              </label>
+              <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button type="button" data-tax="pretax" class="tax-btn py-2 px-3 rounded-lg text-sm font-semibold transition-all">
+                  未稅報價
+                </button>
+                <button type="button" data-tax="taxed" class="tax-btn py-2 px-3 rounded-lg text-sm font-semibold transition-all">
+                  含稅報價 (× 1.05)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card 2: Independent Approval Threshold Input -->
+        <div class="bg-white rounded-2xl border-2 border-slate-200 shadow-sm p-5 sm:p-6">
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-amber-600">Step 2 · 獨立檢查欄位</span>
+              <h2 class="text-base font-bold text-slate-900 mt-0.5">核准上限設定</h2>
+            </div>
+            <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">不影響報價公式</span>
+          </div>
+
+          <div>
+            <label for="input-limit" class="block text-sm font-semibold text-slate-700 mb-2">
+              本案例核准上限 (NT$)
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-3.5 flex items-center text-slate-400 text-sm font-medium">NT$</span>
+              <input
+                id="input-limit"
+                type="number"
+                step="1"
+                value="300000"
+                placeholder="例如：300000"
+                class="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-bold text-slate-900 tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition"
+              />
+            </div>
+            <p class="text-xs text-slate-500 mt-2 leading-relaxed">
+              「報價總額」與「核准上限」為各自獨立之欄位。調整此門檻僅會重新比對是否超限，絕不會改變左側報價公式結果。
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- RIGHT COLUMN: Calculation Results, Approval Check & Installment Table -->
+      <div class="lg:col-span-7 space-y-6">
+
+        <!-- Validation Error State Banner (Shown when inputs are invalid) -->
+        <div id="error-state-card" class="hidden bg-rose-50 border-2 border-rose-200 rounded-2xl p-6 shadow-sm">
+          <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 mt-0.5">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <h3 class="text-base font-bold text-rose-900">無法產生有效報價</h3>
+              <p class="text-sm text-rose-700 mt-1">偵測到以下輸入條件不符合報價規則，系統已停止計算報價金額與分期表：</p>
+              <ul id="error-list" class="mt-3 space-y-1.5 text-sm font-medium text-rose-800 list-disc list-inside bg-white/70 rounded-xl p-3.5 border border-rose-200">
+                <!-- Populated by JS -->
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Valid Quote Output Container -->
+        <div id="valid-result-container" class="space-y-6">
+
+          <!-- Approval Threshold Check Card (Prominent Status Banner) -->
+          <div id="approval-card" class="rounded-2xl border-2 p-5 sm:p-6 shadow-sm transition-colors">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div class="flex items-start gap-3.5">
+                <div id="approval-icon-wrap" class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5">
+                  <!-- Icon injected via JS -->
+                </div>
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="text-xs font-bold uppercase tracking-wider opacity-80">核准門檻檢查結果</span>
+                    <span id="approval-badge" class="px-2.5 py-0.5 text-xs font-bold rounded-full"></span>
+                  </div>
+                  <h3 id="approval-headline" class="text-base sm:text-lg font-bold mt-1"></h3>
+                  <p id="approval-subtext" class="text-xs sm:text-sm mt-1 leading-relaxed"></p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Comparison Metric Strip -->
+            <div class="mt-4 pt-4 border-t border-current/10 grid grid-cols-3 gap-3 text-xs sm:text-sm">
+              <div>
+                <div class="opacity-75">目前報價總額 (<span id="comp-tax-label">含稅</span>)</div>
+                <div id="comp-quote-total" class="font-bold text-base tabular-nums mt-0.5">NT$ 0</div>
+              </div>
+              <div>
+                <div class="opacity-75">本案例核准上限</div>
+                <div id="comp-limit-total" class="font-bold text-base tabular-nums mt-0.5">NT$ 300,000</div>
+              </div>
+              <div>
+                <div id="comp-diff-label" class="opacity-75">門檻差額</div>
+                <div id="comp-diff-value" class="font-bold text-base tabular-nums mt-0.5">NT$ 0</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quote Summary & Formula Breakdown Card -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+            <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-100">
+              <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Quote Summary</span>
+                <h2 class="text-base font-bold text-slate-900 mt-0.5">報價總額與公式明細</h2>
+              </div>
+              <div class="flex items-center gap-2 no-print">
+                <button
+                  id="btn-print-single"
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition flex items-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  <span>列印此報價</span>
+                </button>
+                <button
+                  id="btn-copy-summary"
+                  type="button"
+                  class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition flex items-center gap-1.5"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  <span id="copy-btn-text">複製報價摘要</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Step-by-step Formula Audit Trail -->
+            <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/80 space-y-2.5 text-sm">
+              <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">計算公式拆解</div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">1. 基礎小計 <span class="text-xs text-slate-400">(月費 × 月數)</span></span>
+                <span id="step-base" class="font-semibold text-slate-800 tabular-nums">NT$ 0</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">2. 基本折扣後 <span id="step-discount-label" class="text-xs text-slate-400">(× 100%)</span></span>
+                <span id="step-after-discount" class="font-semibold text-slate-800 tabular-nums">NT$ 0</span>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-slate-600">3. 年付優惠調整 <span id="step-annual-label" class="text-xs text-slate-400">(無年付折扣)</span></span>
+                <span id="step-after-annual" class="font-semibold text-slate-800 tabular-nums">NT$ 0</span>
+              </div>
+              <div class="flex justify-between items-center pt-2 border-t border-slate-200">
+                <span class="text-slate-700 font-medium">4. 稅額加成 <span id="step-tax-label" class="text-xs text-slate-400">(未稅 × 1.00)</span></span>
+                <span id="step-final-formula" class="font-bold text-indigo-700 tabular-nums">NT$ 0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Installment Schedule Card -->
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-100">
+              <div>
+                <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Payment Schedule</span>
+                <h2 class="text-base font-bold text-slate-900 mt-0.5">分期付款與尾差明細表</h2>
+              </div>
+              <div class="flex items-center gap-2 text-xs">
+                <span class="px-2.5 py-1 bg-slate-100 text-slate-700 font-semibold rounded-lg" id="schedule-freq-badge">年付 · 共 1 期</span>
+                <span class="px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold rounded-lg">合計嚴格等於總額</span>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-500 mb-4 leading-relaxed">
+              規則說明：前面各期取「報價總額 ÷ 期數」之整數下界（<code class="px-1 py-0.5 bg-slate-100 rounded text-slate-700">Math.floor</code>），最後一期自動補足尾差，確保各期加總嚴格等於最終報價總額。
+            </p>
+
+            <div class="overflow-x-auto border border-slate-300 rounded-xl">
+              <table class="w-full text-left border-collapse">
+                <thead>
+                  <tr class="bg-slate-200/80 border-b-2 border-slate-300 text-xs font-bold text-slate-700">
+                    <th class="py-3 px-4">期別</th>
+                    <th class="py-3 px-4">說明</th>
+                    <th class="py-3 px-4 text-right">本期應付金額 (NT$)</th>
+                    <th class="py-3 px-4 text-right">累計金額 (NT$)</th>
+                  </tr>
+                </thead>
+                <tbody id="installment-tbody" class="divide-y divide-slate-200 text-sm tabular-nums">
+                  <!-- Populated by JS -->
+                </tbody>
+                <tfoot class="bg-slate-50 border-t-2 border-slate-200 text-sm font-bold text-slate-900 tabular-nums">
+                  <tr>
+                    <td colspan="2" class="py-3 px-4">各期合計（驗證與報價總額一致）</td>
+                    <td id="installment-sum" class="py-3 px-4 text-right text-indigo-700">NT$ 0</td>
+                    <td class="py-3 px-4 text-right text-slate-500">—</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Full-Width Section: CSV Batch Import & Results List -->
+    <section id="csv-section" class="mt-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 sm:p-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-5 mb-5 border-b border-slate-100">
+        <div>
+          <span class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Batch CSV Processor</span>
+          <h2 class="text-base sm:text-lg font-bold text-slate-900 mt-0.5">CSV 批次讀取與報價結果列表</h2>
+          <p class="text-xs text-slate-500 mt-1 no-print">支援上傳包含 <code class="px-1 py-0.5 bg-slate-100 rounded text-slate-700">case,fee,months,discount,payment,tax,approved_ceiling</code> 欄位的 CSV 檔，點擊任一列可帶入上方單筆計算機。</p>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2.5 no-print">
+          <label class="cursor-pointer px-3.5 py-2 text-xs sm:text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-xs transition flex items-center gap-1.5">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>選擇 CSV 檔案</span>
+            <input id="csv-file-input" type="file" accept=".csv,text/csv" class="hidden" />
+          </label>
+
+          <button
+            id="btn-load-sample-csv"
+            type="button"
+            class="px-3.5 py-2 text-xs sm:text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-xl transition"
+          >
+            載入內建 Q01–Q11 CSV 範例
+          </button>
+
+          <button
+            id="btn-export-csv"
+            type="button"
+            disabled
+            class="px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:pointer-events-none rounded-xl transition"
+          >
+            匯出結果 CSV
+          </button>
+        </div>
+      </div>
+
+      <!-- CSV Error Banner -->
+      <div id="csv-error-banner" class="hidden mb-5 bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-800">
+        <strong class="font-bold">CSV 讀取錯誤：</strong>
+        <span id="csv-error-msg"></span>
+      </div>
+
+      <!-- Batch Summary Pills -->
+      <div id="csv-summary-bar" class="hidden flex flex-wrap items-center gap-2.5 mb-4 text-xs font-semibold">
+        <span id="csv-stat-total" class="px-3 py-1.5 rounded-full bg-slate-100 text-slate-700">總筆數：0</span>
+        <span id="csv-stat-valid" class="px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">有效報價：0</span>
+        <span id="csv-stat-invalid" class="px-3 py-1.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">無效阻擋：0</span>
+        <span id="csv-stat-exceeded" class="px-3 py-1.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">超過上限：0</span>
+        <span id="csv-stat-regression" class="hidden px-3 py-1.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">預期比對：-</span>
+      </div>
+
+      <!-- Empty Placeholder -->
+      <div id="csv-placeholder" class="no-print text-center py-10 px-4 bg-slate-50 border border-dashed border-slate-300 rounded-xl text-xs sm:text-sm text-slate-500">
+        尚未載入 CSV 資料。請點擊上方「選擇 CSV 檔案」上傳你的檔案，或點擊「載入內建 Q01–Q11 CSV 範例」立即預覽列表。
+      </div>
+
+      <!-- Results Table -->
+      <div id="csv-table-wrap" class="hidden overflow-x-auto border border-slate-300 rounded-xl shadow-xs">
+        <table class="w-full text-left border-collapse text-xs sm:text-sm">
+          <thead>
+            <tr class="bg-slate-200/90 border-b-2 border-slate-300 text-xs font-bold text-slate-800 whitespace-nowrap">
+              <th class="py-3.5 px-3.5">案例</th>
+              <th class="py-3.5 px-3.5 text-right">月費</th>
+              <th class="py-3.5 px-3.5 text-right">月數</th>
+              <th class="py-3.5 px-3.5 text-right">折扣</th>
+              <th class="py-3.5 px-3.5">付款</th>
+              <th class="py-3.5 px-3.5">含稅</th>
+              <th class="py-3.5 px-3.5">狀態 / 錯誤說明</th>
+              <th class="py-3.5 px-3.5 text-right">稅前總額</th>
+              <th class="py-3.5 px-3.5 text-right">含稅總額</th>
+              <th class="py-3.5 px-3.5">分期明細</th>
+              <th class="py-3.5 px-3.5 text-right">核准上限</th>
+              <th class="py-3.5 px-3.5">核准狀態</th>
+              <th id="csv-reg-header" class="hidden py-3.5 px-3.5">CSV 預期比對</th>
+            </tr>
+          </thead>
+          <tbody id="csv-tbody" class="divide-y divide-slate-200 tabular-nums">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer Disclaimer -->
+  <footer class="bg-white border-t border-slate-200 mt-12">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
+      <p class="font-medium text-slate-600">
+        ⚠️ 聲明：本工具僅為虛構報價規則之計算與核准門檻演算展示，並非任何公司之正式商業政策、合約承諾或稅務建議。
+      </p>
+      <p class="tabular-nums text-slate-400">Ruleset v1.0 · Q01–Q11 Verified</p>
+    </div>
+  </footer>
+
+  <script>
+    /**
+     * 虛構報價與核准門檻計算機 核心邏輯
+     * 嚴格遵守以下規格：
+     * 1. 月費：基礎 30000、進階 60000、客製 100000（可手動測試邊界值，不可為空或負數；若為 0 視同有效或依需求，這裡允許 >= 0 且非空值，負數與空值阻擋）
+     * 2. 期間：只能 3、6、12 月（整數）
+     * 3. 基本折扣：0–30%
+     * 4. 計算：月費 × 月數 × (1 - 折扣)；年付限 12 月，另乘 0.97。若選含稅，再乘 1.05。
+     * 5. 最終稅前與含稅總額四捨五入為整元。
+     * 6. 月付期數 = 月數，季付期數 = 月數 ÷ 3，年付一期。
+     * 7. 前面每期取總額 ÷ 期數的整數下界；最後一期補尾差，各期合計須等於總額。
+     * 8. 空值、負月費、錯誤期間、折扣超範圍、非12月選年付 -> 不計算、不產生有效報價。
+     * 9. 核准門檻是另一項獨立檢查，改變門檻不可改變報價公式。
+     */
+
+    // Application State
+    const state = {
+      monthlyFee: '30000',
+      months: '12',
+      discount: '0',
+      frequency: 'annual', // 'monthly' | 'quarterly' | 'annual'
+      taxMode: 'taxed',    // 'pretax' | 'taxed'
+      approvalLimit: '300000',
+      activeCaseId: null,
+    };
+
+    // Q01 - Q11 Regression Test Cases
+    const QA_CASES = [
+      {
+        id: 'Q01',
+        title: '基礎方案 · 3個月 · 無折扣 · 月付（未稅）',
+        desc: '基準回歸案例：30,000 × 3 = 90,000，分 3 期每期 30,000。',
+        params: { monthlyFee: '30000', months: '3', discount: '0', frequency: 'monthly', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '回歸基準',
+      },
+      {
+        id: 'Q02',
+        title: '進階方案 · 6個月 · 10%折扣 · 季付（未稅）',
+        desc: '60,000 × 6 × 0.9 = 324,000，季付共 2 期（每期 162,000）。',
+        params: { monthlyFee: '60000', months: '6', discount: '10', frequency: 'quarterly', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '季付測試',
+      },
+      {
+        id: 'Q03',
+        title: '客製方案 · 12個月 · 20%折扣 · 年付（未稅）',
+        desc: '100,000 × 12 × 0.8 × 0.97 = 931,200，年付 1 期。',
+        params: { monthlyFee: '100000', months: '12', discount: '20', frequency: 'annual', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '年付優惠',
+      },
+      {
+        id: 'Q04',
+        title: '基礎方案 · 12個月 · 15%折扣 · 年付（含稅）',
+        desc: '30,000 × 12 × 0.85 × 0.97 × 1.05 = NT$311,661（Q10 對照基準）。',
+        params: { monthlyFee: '30000', months: '12', discount: '15', frequency: 'annual', taxMode: 'taxed', approvalLimit: '300000' },
+        tag: 'Q10 基準',
+      },
+      {
+        id: 'Q05',
+        title: '尾差測試 · 進階 3個月 · 7%折扣 · 月付（含稅）',
+        desc: '總額 175,770 ÷ 3 = 58,590；若改為 13% 折扣則產生整數下界與尾差。',
+        params: { monthlyFee: '60000', months: '3', discount: '13', frequency: 'monthly', taxMode: 'taxed', approvalLimit: '300000' },
+        tag: '尾差驗證',
+      },
+      {
+        id: 'Q06',
+        title: '無效輸入 · 錯誤合約期間（5 個月）',
+        desc: '期間非 3、6、12 月，系統應阻擋計算並顯示錯誤提示。',
+        params: { monthlyFee: '30000', months: '5', discount: '0', frequency: 'monthly', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '防呆測試',
+      },
+      {
+        id: 'Q07',
+        title: '無效輸入 · 折扣超出範圍（35%）',
+        desc: '基本折扣超過 30% 上限，不應產生有效報價。',
+        params: { monthlyFee: '60000', months: '6', discount: '35', frequency: 'quarterly', taxMode: 'taxed', approvalLimit: '300000' },
+        tag: '防呆測試',
+      },
+      {
+        id: 'Q08',
+        title: '無效輸入 · 負月費（-30,000）或空值',
+        desc: '月費為負數時不計算，確保不會產出負向報價。',
+        params: { monthlyFee: '-30000', months: '3', discount: '0', frequency: 'monthly', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '防呆測試',
+      },
+      {
+        id: 'Q09',
+        title: '無效組合 · 6個月選擇年付',
+        desc: '規則規定「年付限12月」，6 個月選年付應判定無效。',
+        params: { monthlyFee: '30000', months: '6', discount: '0', frequency: 'annual', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '規則限制',
+      },
+      {
+        id: 'Q10',
+        title: '門檻超限 · Q04 含稅報價比對 NT$300,000 上限',
+        desc: 'Q04 含稅總額 NT$311,661 > NT$300,000，超出 NT$11,661，應提示停止承諾。',
+        params: { monthlyFee: '30000', months: '12', discount: '15', frequency: 'annual', taxMode: 'taxed', approvalLimit: '300000' },
+        tag: '超限警示',
+      },
+      {
+        id: 'Q11',
+        title: '門檻內 · Q01 報價比對 NT$300,000 上限',
+        desc: 'Q01 報價 NT$90,000 ≤ NT$300,000，顯示在上限內（不代表正式接受報價）。',
+        params: { monthlyFee: '30000', months: '3', discount: '0', frequency: 'monthly', taxMode: 'pretax', approvalLimit: '300000' },
+        tag: '上限內',
+      },
+    ];
+
+    // Formatting Helpers
+    function formatCurrency(num) {
+      return 'NT$ ' + Math.round(num).toLocaleString('zh-TW');
+    }
+
+    function formatNumber(num, maxDecimals = 2) {
+      return Number(num).toLocaleString('zh-TW', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: maxDecimals,
+      });
+    }
+
+    // DOM References
+    const el = {
+      inputFee: document.getElementById('input-fee'),
+      inputMonths: document.getElementById('input-months'),
+      inputDiscount: document.getElementById('input-discount'),
+      rangeDiscount: document.getElementById('range-discount'),
+      inputLimit: document.getElementById('input-limit'),
+      tierBtns: document.querySelectorAll('.tier-btn'),
+      monthBtns: document.querySelectorAll('.month-btn'),
+      freqBtns: document.querySelectorAll('.freq-btn'),
+      taxBtns: document.querySelectorAll('.tax-btn'),
+      errorCard: document.getElementById('error-state-card'),
+      errorList: document.getElementById('error-list'),
+      validContainer: document.getElementById('valid-result-container'),
+      // Approval Elements
+      approvalCard: document.getElementById('approval-card'),
+      approvalIconWrap: document.getElementById('approval-icon-wrap'),
+      approvalBadge: document.getElementById('approval-badge'),
+      approvalHeadline: document.getElementById('approval-headline'),
+      approvalSubtext: document.getElementById('approval-subtext'),
+      compTaxLabel: document.getElementById('comp-tax-label'),
+      compQuoteTotal: document.getElementById('comp-quote-total'),
+      compLimitTotal: document.getElementById('comp-limit-total'),
+      compDiffLabel: document.getElementById('comp-diff-label'),
+      compDiffValue: document.getElementById('comp-diff-value'),
+      // Quote Summary Elements
+      cardPretax: document.getElementById('card-pretax'),
+      cardTaxed: document.getElementById('card-taxed'),
+      tagActivePretax: document.getElementById('tag-active-pretax'),
+      tagActiveTaxed: document.getElementById('tag-active-taxed'),
+      valPretax: document.getElementById('val-pretax'),
+      rawPretax: document.getElementById('raw-pretax'),
+      valTaxed: document.getElementById('val-taxed'),
+      rawTaxed: document.getElementById('raw-taxed'),
+      stepBase: document.getElementById('step-base'),
+      stepDiscountLabel: document.getElementById('step-discount-label'),
+      stepAfterDiscount: document.getElementById('step-after-discount'),
+      stepAnnualLabel: document.getElementById('step-annual-label'),
+      stepAfterAnnual: document.getElementById('step-after-annual'),
+      stepTaxLabel: document.getElementById('step-tax-label'),
+      stepFinalFormula: document.getElementById('step-final-formula'),
+      // Schedule Elements
+      scheduleFreqBadge: document.getElementById('schedule-freq-badge'),
+      installmentTbody: document.getElementById('installment-tbody'),
+      installmentSum: document.getElementById('installment-sum'),
+      // QA & Actions
+      qaPanel: document.getElementById('qa-panel'),
+      qaGrid: document.getElementById('qa-grid'),
+      btnToggleQa: document.getElementById('btn-toggle-qa'),
+      btnCloseQa: document.getElementById('btn-close-qa'),
+      btnReset: document.getElementById('btn-reset'),
+      activeCaseBanner: document.getElementById('active-case-banner'),
+      activeCaseBadge: document.getElementById('active-case-badge'),
+      activeCaseTitle: document.getElementById('active-case-title'),
+      activeCaseDesc: document.getElementById('active-case-desc'),
+      btnClearCase: document.getElementById('btn-clear-case'),
+      btnCopySummary: document.getElementById('btn-copy-summary'),
+      copyBtnText: document.getElementById('copy-btn-text'),
+      btnPrint: document.getElementById('btn-print'),
+      btnPrintSingle: document.getElementById('btn-print-single'),
+      printTimestamp: document.getElementById('print-timestamp'),
+      printParamsSummary: document.getElementById('print-params-summary'),
+      csvSection: document.getElementById('csv-section'),
+      // CSV Elements
+      csvFileInput: document.getElementById('csv-file-input'),
+      btnLoadSampleCsv: document.getElementById('btn-load-sample-csv'),
+      btnExportCsv: document.getElementById('btn-export-csv'),
+      csvErrorBanner: document.getElementById('csv-error-banner'),
+      csvErrorMsg: document.getElementById('csv-error-msg'),
+      csvSummaryBar: document.getElementById('csv-summary-bar'),
+      csvStatTotal: document.getElementById('csv-stat-total'),
+      csvStatValid: document.getElementById('csv-stat-valid'),
+      csvStatInvalid: document.getElementById('csv-stat-invalid'),
+      csvStatExceeded: document.getElementById('csv-stat-exceeded'),
+      csvStatRegression: document.getElementById('csv-stat-regression'),
+      csvPlaceholder: document.getElementById('csv-placeholder'),
+      csvTableWrap: document.getElementById('csv-table-wrap'),
+      csvRegHeader: document.getElementById('csv-reg-header'),
+      csvTbody: document.getElementById('csv-tbody'),
+    };
+
+    const BUILTIN_SAMPLE_CSV = `case,fee,months,discount,payment,tax,net,total,installments,expected,approved_ceiling,approval_check
+Q01,30000,3,0,quarter,TRUE,90000,94500,94500,valid,,not_requested
+Q02,30000,6,0,quarter,TRUE,180000,189000,94500|94500,valid,,not_requested
+Q03,30000,12,0,quarter,TRUE,360000,378000,94500|94500|94500|94500,valid,,not_requested
+Q04,30000,12,15,year,TRUE,296820,311661,311661,valid,,not_requested
+Q05,30000,3,0,year,TRUE,,,,invalid_year,,not_requested
+Q06,-1,12,0,month,TRUE,,,,invalid_fee,,not_requested
+Q07,30000,,0,month,TRUE,,,,missing_months,,not_requested
+Q08,30000,12,31,month,TRUE,,,,invalid_discount,,not_requested
+Q09,30000,12,17.3,quarter,TRUE,297720,312606,78151|78151|78151|78153,valid,,not_requested
+Q10,30000,12,15,year,TRUE,296820,311661,311661,valid,300000,over_by_11661
+Q11,30000,3,0,quarter,TRUE,90000,94500,94500,valid,300000,within_ceiling`;
+
+    let lastBatchExportRows = [];
+
+    // Core Validation & Calculation Engine
+    function evaluateQuote() {
+      const errors = [];
+
+      // 1. Validate Monthly Fee (空值、非數字、負月費不計算；0元亦非有效商業方案月費或視為無效)
+      const feeStr = String(state.monthlyFee).trim();
+      const fee = Number(feeStr);
+      if (feeStr === '' || Number.isNaN(fee)) {
+        errors.push('月費不可為空值，請輸入有效金額。');
+      } else if (fee < 0) {
+        errors.push(`月費不可為負數（目前輸入：${fee}）。`);
+      } else if (fee === 0) {
+        errors.push('月費不可為 0，請選擇基礎 (30,000)、進階 (60,000)、客製 (100,000) 或輸入正數月費。');
+      }
+
+      // 2. Validate Contract Months (只能 3、6、12 月)
+      const monthsStr = String(state.months).trim();
+      const months = Number(monthsStr);
+      if (monthsStr === '' || Number.isNaN(months) || !Number.isInteger(months) || ![3, 6, 12].includes(months)) {
+        errors.push(`合約期間只能為 3、6 或 12 個月（目前輸入：${monthsStr === '' ? '空值' : monthsStr}）。`);
+      }
+
+      // 3. Validate Discount (0% - 30%)
+      const discountStr = String(state.discount).trim();
+      const discountPct = Number(discountStr);
+      if (discountStr === '' || Number.isNaN(discountPct)) {
+        errors.push('基本折扣不可為空值，請輸入 0% 至 30% 之間的數值。');
+      } else if (discountPct < 0 || discountPct > 30) {
+        errors.push(`基本折扣超出允許範圍 0%–30%（目前輸入：${discountPct}%）。`);
+      }
+
+      // 4. Validate Payment Frequency (年付限 12 月)
+      if (state.frequency === 'annual' && months !== 12) {
+        errors.push(`「年付」僅限 12 個月合約使用（目前合約期間為 ${monthsStr || '未設定'} 個月）。`);
+      }
+
+      if (errors.length > 0) {
+        return { valid: false, errors };
+      }
+
+      // Valid inputs -> Execute Formula
+      const discountRate = discountPct / 100;
+      const baseAmount = fee * months;
+      const afterDiscount = baseAmount * (1 - discountRate);
+      const isAnnual = state.frequency === 'annual' && months === 12;
+      const afterAnnual = isAnnual ? afterDiscount * 0.97 : afterDiscount;
+
+      // Pre-tax and Tax-included rounded to nearest integer NTD
+      const preTaxRaw = afterAnnual;
+      const taxedRaw = afterAnnual * 1.05;
+      const preTaxTotal = Math.round(preTaxRaw);
+      const taxedTotal = Math.round(taxedRaw);
+
+      // Active Total based on selected tax mode
+      const activeTotal = state.taxMode === 'taxed' ? taxedTotal : preTaxTotal;
+
+      // Installment Count
+      let installments = 1;
+      let freqLabel = '年付';
+      if (state.frequency === 'monthly') {
+        installments = months;
+        freqLabel = '月付';
+      } else if (state.frequency === 'quarterly') {
+        installments = months / 3;
+        freqLabel = '季付';
+      } else {
+        installments = 1;
+        freqLabel = '年付';
+      }
+
+      // Installment Schedule (Earlier = floor(Total / N), Last = remainder)
+      const baseInstallment = Math.floor(activeTotal / installments);
+      const lastInstallment = activeTotal - baseInstallment * (installments - 1);
+      const schedule = [];
+      let cumulative = 0;
+
+      for (let i = 1; i <= installments; i++) {
+        const isLast = i === installments;
+        const amount = isLast ? lastInstallment : baseInstallment;
+        cumulative += amount;
+        schedule.push({
+          period: i,
+          amount,
+          cumulative,
+          isLast,
+          hasRemainder: isLast && installments > 1 && lastInstallment !== baseInstallment,
+        });
+      }
+
+      return {
+        valid: true,
+        fee,
+        months,
+        discountPct,
+        isAnnual,
+        baseAmount,
+        afterDiscount,
+        afterAnnual,
+        preTaxRaw,
+        taxedRaw,
+        preTaxTotal,
+        taxedTotal,
+        activeTotal,
+        installments,
+        freqLabel,
+        schedule,
+      };
+    }
+
+    // Separate Approval Threshold Check (Decoupled from Quote Calculation)
+    function evaluateApproval(quoteTotal) {
+      const limitStr = String(state.approvalLimit).trim();
+      const limit = Number(limitStr);
+      const hasValidLimit = limitStr !== '' && !Number.isNaN(limit) && limit >= 0;
+
+      if (!hasValidLimit) {
+        return {
+          status: 'invalid_limit',
+          limit: 0,
+          diff: 0,
+        };
+      }
+
+      const diff = quoteTotal - limit;
+      if (quoteTotal > limit) {
+        return {
+          status: 'exceeded',
+          limit,
+          overage: diff,
+        };
+      } else {
+        return {
+          status: 'within',
+          limit,
+          remaining: limit - quoteTotal,
+        };
+      }
+    }
+
+    // Render UI
+    function render() {
+      syncControlStyles();
+
+      const result = evaluateQuote();
+
+      if (!result.valid) {
+        el.errorCard.classList.remove('hidden');
+        el.validContainer.classList.add('hidden');
+        el.errorList.innerHTML = result.errors.map(err => `<li>${err}</li>`).join('');
+        return;
+      }
+
+      el.errorCard.classList.add('hidden');
+      el.validContainer.classList.remove('hidden');
+
+      // 1. Render Quote Totals & Formula Breakdown
+      el.valPretax.textContent = formatCurrency(result.preTaxTotal);
+      el.rawPretax.textContent = `精確未捨入值：${formatNumber(result.preTaxRaw, 2)}`;
+
+      el.valTaxed.textContent = formatCurrency(result.taxedTotal);
+      el.rawTaxed.textContent = `精確未捨入值：${formatNumber(result.taxedRaw, 2)}`;
+
+      if (state.taxMode === 'taxed') {
+        el.cardTaxed.className = 'p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/40 transition-all';
+        el.tagActiveTaxed.classList.remove('hidden');
+        el.cardPretax.className = 'p-4 rounded-xl border border-slate-200 bg-white transition-all opacity-85';
+        el.tagActivePretax.classList.add('hidden');
+      } else {
+        el.cardPretax.className = 'p-4 rounded-xl border-2 border-indigo-600 bg-indigo-50/40 transition-all';
+        el.tagActivePretax.classList.remove('hidden');
+        el.cardTaxed.className = 'p-4 rounded-xl border border-slate-200 bg-white transition-all opacity-85';
+        el.tagActiveTaxed.classList.add('hidden');
+      }
+
+      el.stepBase.textContent = `${formatNumber(result.fee)} × ${result.months} = ${formatCurrency(result.baseAmount)}`;
+      el.stepDiscountLabel.textContent = `(折扣 ${result.discountPct}%，乘數 ${(1 - result.discountPct / 100).toFixed(2)})`;
+      el.stepAfterDiscount.textContent = formatCurrency(result.afterDiscount);
+      el.stepAnnualLabel.textContent = result.isAnnual ? '(年付 12 個月，另乘 0.97)' : '(非年付，乘數 1.00)';
+      el.stepAfterAnnual.textContent = formatNumber(result.afterAnnual, 2);
+      el.stepTaxLabel.textContent = state.taxMode === 'taxed' ? '(含稅 × 1.05，四捨五入)' : '(未稅 × 1.00，四捨五入)';
+      el.stepFinalFormula.textContent = formatCurrency(result.activeTotal);
+
+      // 2. Render Installment Schedule
+      el.scheduleFreqBadge.textContent = `${result.freqLabel} · 共 ${result.installments} 期`;
+      el.installmentTbody.innerHTML = result.schedule.map((row, idx) => {
+        let note = '標準期款（整數下界）';
+        if (result.installments === 1) {
+          note = '一次付清（全額）';
+        } else if (row.isLast) {
+          note = row.hasRemainder ? '末期（含補足尾差）' : '末期（無尾差）';
+        }
+        const rowBg = row.isLast && result.installments > 1
+          ? 'bg-indigo-50/80'
+          : idx % 2 === 1
+            ? 'bg-slate-100/70'
+            : 'bg-white';
+        return `
+          <tr class="${rowBg} hover:bg-indigo-50/50 transition-colors">
+            <td class="py-3 px-4 font-semibold text-slate-900">第 ${row.period} 期</td>
+            <td class="py-3 px-4 text-xs text-slate-600">
+              ${note}
+              ${row.hasRemainder ? '<span class="ml-1.5 px-1.5 py-0.5 text-[11px] font-semibold bg-amber-100 text-amber-800 border border-amber-300 rounded">尾差調整</span>' : ''}
+            </td>
+            <td class="py-3 px-4 text-right font-semibold text-slate-900">${formatCurrency(row.amount)}</td>
+            <td class="py-3 px-4 text-right text-slate-600">${formatCurrency(row.cumulative)}</td>
+          </tr>
+        `;
+      }).join('');
+      el.installmentSum.textContent = formatCurrency(result.activeTotal);
+
+      // 3. Render Independent Approval Threshold Comparison
+      const approval = evaluateApproval(result.activeTotal);
+      el.compTaxLabel.textContent = state.taxMode === 'taxed' ? '含稅' : '未稅';
+      el.compQuoteTotal.textContent = formatCurrency(result.activeTotal);
+
+      if (approval.status === 'invalid_limit') {
+        el.approvalCard.className = 'rounded-2xl border-2 border-slate-300 bg-slate-100 text-slate-800 p-5 sm:p-6 shadow-sm transition-colors';
+        el.approvalIconWrap.className = 'w-10 h-10 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center shrink-0 mt-0.5';
+        el.approvalIconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+        el.approvalBadge.className = 'px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-300 text-slate-800';
+        el.approvalBadge.textContent = '未設定有效上限';
+        el.approvalHeadline.textContent = '請輸入有效的核准上限金額以進行門檻比對';
+        el.approvalSubtext.textContent = '核准上限需為大於或等於 0 的數字。報價總額已依公式獨立計算完成。';
+        el.compLimitTotal.textContent = '未設定';
+        el.compDiffLabel.textContent = '門檻差額';
+        el.compDiffValue.textContent = '—';
+      } else if (approval.status === 'exceeded') {
+        el.approvalCard.className = 'rounded-2xl border-2 border-amber-400 bg-amber-50 text-amber-950 p-5 sm:p-6 shadow-sm transition-colors';
+        el.approvalIconWrap.className = 'w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm';
+        el.approvalIconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>`;
+        el.approvalBadge.className = 'px-2.5 py-0.5 text-xs font-bold rounded-full bg-amber-600 text-white';
+        el.approvalBadge.textContent = '超過核准上限';
+        el.approvalHeadline.textContent = `超過上限 ${formatCurrency(approval.overage)}：請停止承諾、取得核准`;
+        el.approvalSubtext.textContent = '目前報價總額已高於本案例設定之核准上限。在取得正式核准前，請勿對客戶作出任何價格或合約承諾。';
+        el.compLimitTotal.textContent = formatCurrency(approval.limit);
+        el.compDiffLabel.textContent = '超出上限金額';
+        el.compDiffValue.textContent = `+ ${formatCurrency(approval.overage)}`;
+        el.compDiffValue.className = 'font-bold text-base tabular-nums mt-0.5 text-rose-700';
+      } else {
+        el.approvalCard.className = 'rounded-2xl border-2 border-emerald-300 bg-emerald-50/80 text-emerald-950 p-5 sm:p-6 shadow-sm transition-colors';
+        el.approvalIconWrap.className = 'w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-sm';
+        el.approvalIconWrap.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+        el.approvalBadge.className = 'px-2.5 py-0.5 text-xs font-bold rounded-full bg-emerald-600 text-white';
+        el.approvalBadge.textContent = '在核准上限內';
+        el.approvalHeadline.textContent = '在核准上限內（僅表示在本案例上限內，不代表正式接受報價）';
+        el.approvalSubtext.textContent = `目前報價低於或等於本案例上限（尚餘額度 ${formatCurrency(approval.remaining)}）。此檢查僅供門檻檢核，不構成正式報價單或合約生效。`;
+        el.compLimitTotal.textContent = formatCurrency(approval.limit);
+        el.compDiffLabel.textContent = '距離上限餘額';
+        el.compDiffValue.textContent = formatCurrency(approval.remaining);
+        el.compDiffValue.className = 'font-bold text-base tabular-nums mt-0.5 text-emerald-700';
+      }
+    }
+
+    // Sync Button Active States & Input Values
+    function syncControlStyles() {
+      // Tier buttons
+      const feeNum = Number(state.monthlyFee);
+      el.tierBtns.forEach(btn => {
+        const btnFee = Number(btn.dataset.fee);
+        const isActive = state.monthlyFee !== '' && feeNum === btnFee;
+        btn.className = isActive
+          ? 'tier-btn p-3 rounded-xl border-2 border-indigo-600 bg-indigo-50/60 text-left transition-all shadow-xs'
+          : 'tier-btn p-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-left transition-all';
+      });
+
+      // Month buttons
+      const monthsNum = Number(state.months);
+      el.monthBtns.forEach(btn => {
+        const btnM = Number(btn.dataset.months);
+        const isActive = state.months !== '' && monthsNum === btnM;
+        btn.className = isActive
+          ? 'month-btn py-2.5 px-3 rounded-xl border-2 border-indigo-600 bg-indigo-50/60 text-indigo-900 text-sm font-bold tabular-nums transition-all'
+          : 'month-btn py-2.5 px-3 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-700 text-sm font-semibold tabular-nums transition-all';
+      });
+
+      // Frequency buttons
+      el.freqBtns.forEach(btn => {
+        const isActive = btn.dataset.freq === state.frequency;
+        const isAnnualMismatch = btn.dataset.freq === 'annual' && monthsNum !== 12;
+        if (isActive) {
+          btn.className = isAnnualMismatch
+            ? 'freq-btn p-2.5 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 text-center transition-all'
+            : 'freq-btn p-2.5 rounded-xl border-2 border-indigo-600 bg-indigo-50/60 text-indigo-950 text-center transition-all';
+        } else {
+          btn.className = isAnnualMismatch
+            ? 'freq-btn p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-400 text-center transition-all'
+            : 'freq-btn p-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-slate-800 text-center transition-all';
+        }
+      });
+
+      // Tax buttons
+      el.taxBtns.forEach(btn => {
+        const isActive = btn.dataset.tax === state.taxMode;
+        btn.className = isActive
+          ? 'tax-btn py-2 px-3 rounded-lg text-sm font-bold bg-white text-indigo-700 shadow-xs transition-all'
+          : 'tax-btn py-2 px-3 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 transition-all';
+      });
+
+      // Active QA Case Banner
+      if (state.activeCaseId) {
+        const found = QA_CASES.find(c => c.id === state.activeCaseId);
+        if (found) {
+          el.activeCaseBanner.classList.remove('hidden');
+          el.activeCaseBadge.textContent = found.id;
+          el.activeCaseTitle.textContent = found.title;
+          el.activeCaseDesc.textContent = found.desc;
+        }
+      } else {
+        el.activeCaseBanner.classList.add('hidden');
+      }
+    }
+
+    function applyStateToInputs() {
+      el.inputFee.value = state.monthlyFee;
+      el.inputMonths.value = state.months;
+      el.inputDiscount.value = state.discount;
+      const dNum = Number(state.discount);
+      if (!Number.isNaN(dNum) && dNum >= 0 && dNum <= 30) {
+        el.rangeDiscount.value = dNum;
+      }
+      el.inputLimit.value = state.approvalLimit;
+      render();
+    }
+
+    function clearActiveCase() {
+      state.activeCaseId = null;
+    }
+
+    // Build QA Grid
+    function initQaGrid() {
+      el.qaGrid.innerHTML = QA_CASES.map(item => `
+        <button
+          type="button"
+          data-qa-id="${item.id}"
+          class="qa-case-btn text-left p-3 rounded-xl bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-indigo-400 transition-all group flex flex-col justify-between"
+        >
+          <div>
+            <div class="flex items-center justify-between gap-2 mb-1.5">
+              <span class="px-2 py-0.5 text-xs font-bold bg-indigo-500/20 text-indigo-300 rounded">${item.id}</span>
+              <span class="text-[11px] text-slate-400 group-hover:text-indigo-300 transition">${item.tag}</span>
+            </div>
+            <div class="text-xs font-semibold text-white leading-snug">${item.title}</div>
+          </div>
+          <div class="text-[11px] text-slate-400 mt-2 line-clamp-2">${item.desc}</div>
+        </button>
+      `).join('');
+
+      document.querySelectorAll('.qa-case-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const qaId = btn.dataset.qaId;
+          const found = QA_CASES.find(c => c.id === qaId);
+          if (!found) return;
+          Object.assign(state, found.params);
+          state.activeCaseId = found.id;
+          applyStateToInputs();
+        });
+      });
+    }
+
+    // Event Listeners
+    el.tierBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearActiveCase();
+        state.monthlyFee = btn.dataset.fee;
+        el.inputFee.value = state.monthlyFee;
+        render();
+      });
+    });
+
+    el.inputFee.addEventListener('input', (e) => {
+      clearActiveCase();
+      state.monthlyFee = e.target.value;
+      render();
+    });
+
+    el.monthBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearActiveCase();
+        state.months = btn.dataset.months;
+        el.inputMonths.value = state.months;
+        render();
+      });
+    });
+
+    el.inputMonths.addEventListener('input', (e) => {
+      clearActiveCase();
+      state.months = e.target.value;
+      render();
+    });
+
+    el.rangeDiscount.addEventListener('input', (e) => {
+      clearActiveCase();
+      state.discount = e.target.value;
+      el.inputDiscount.value = state.discount;
+      render();
+    });
+
+    el.inputDiscount.addEventListener('input', (e) => {
+      clearActiveCase();
+      state.discount = e.target.value;
+      const val = Number(e.target.value);
+      if (!Number.isNaN(val) && val >= 0 && val <= 30) {
+        el.rangeDiscount.value = val;
+      }
+      render();
+    });
+
+    el.freqBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearActiveCase();
+        state.frequency = btn.dataset.freq;
+        render();
+      });
+    });
+
+    el.taxBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        clearActiveCase();
+        state.taxMode = btn.dataset.tax;
+        render();
+      });
+    });
+
+    el.inputLimit.addEventListener('input', (e) => {
+      clearActiveCase();
+      state.approvalLimit = e.target.value;
+      render();
+    });
+
+    el.btnToggleQa.addEventListener('click', () => {
+      el.qaPanel.classList.toggle('hidden');
+    });
+
+    el.btnCloseQa.addEventListener('click', () => {
+      el.qaPanel.classList.add('hidden');
+    });
+
+    el.btnClearCase.addEventListener('click', () => {
+      clearActiveCase();
+      render();
+    });
+
+    el.btnReset.addEventListener('click', () => {
+      Object.assign(state, {
+        monthlyFee: '30000',
+        months: '12',
+        discount: '0',
+        frequency: 'annual',
+        taxMode: 'taxed',
+        approvalLimit: '300000',
+        activeCaseId: null,
+      });
+      applyStateToInputs();
+    });
+
+    // Copy Quote Summary using execCommand fallback for iframe compatibility
+    el.btnCopySummary.addEventListener('click', () => {
+      const res = evaluateQuote();
+      if (!res.valid) return;
+      const approval = evaluateApproval(res.activeTotal);
+      let approvalLine = '';
+      if (approval.status === 'exceeded') {
+        approvalLine = `核准門檻檢查：超過上限 ${formatCurrency(approval.overage)}（請停止承諾、取得核准）`;
+      } else if (approval.status === 'within') {
+        approvalLine = `核准門檻檢查：在上限內（上限 ${formatCurrency(approval.limit)}，僅表示在本案例上限內，不代表正式接受報價）`;
+      } else {
+        approvalLine = '核准門檻檢查：未設定有效上限';
+      }
+
+      const summaryText = [
+        '【虛構報價演算摘要】',
+        `月費：${formatCurrency(res.fee)} / 月`,
+        `合約期間：${res.months} 個月`,
+        `基本折扣：${res.discountPct}%`,
+        `付款週期：${res.freqLabel}（共 ${res.installments} 期）`,
+        `最終未稅總額：${formatCurrency(res.preTaxTotal)}`,
+        `最終含稅總額：${formatCurrency(res.taxedTotal)}`,
+        `採用基準（${state.taxMode === 'taxed' ? '含稅' : '未稅'}）：${formatCurrency(res.activeTotal)}`,
+        approvalLine,
+        '※ 註：本演算僅供規則測試，非公司正式政策或稅務建議。',
+      ].join('\n');
+
+      const textarea = document.createElement('textarea');
+      textarea.value = summaryText;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        el.copyBtnText.textContent = '已複製摘要！';
+        setTimeout(() => {
+          el.copyBtnText.textContent = '複製報價摘要';
+        }, 2000);
+      } catch (err) {
+        el.copyBtnText.textContent = '複製失敗';
+      }
+      document.body.removeChild(textarea);
+    });
+
+    // Print Handler (自動填入列印時間與當前條件摘要後呼叫瀏覽器列印)
+    function triggerPrint() {
+      const now = new Date();
+      el.printTimestamp.textContent = '列印時間：' + now.toLocaleString('zh-TW');
+
+      const res = evaluateQuote();
+      if (res.valid) {
+        const limitText = String(state.approvalLimit).trim() !== ''
+          ? formatCurrency(Number(state.approvalLimit))
+          : '未設定';
+        el.printParamsSummary.textContent =
+          `試算條件：月費 ${formatCurrency(res.fee)} ｜ 期間 ${res.months} 個月 ｜ 折扣 ${res.discountPct}% ｜ ` +
+          `付款 ${res.freqLabel} ｜ 稅別 ${state.taxMode === 'taxed' ? '含稅 (×1.05)' : '未稅'} ｜ 核准上限 ${limitText}`;
+      } else {
+        el.printParamsSummary.textContent = '試算狀態：目前輸入條件無效（未產生有效報價）';
+      }
+
+      // 若下方 CSV 區塊尚未載入任何資料，列印時暫時隱藏整個 CSV 區塊避免印出空白標題
+      const isCsvEmpty = el.csvTableWrap.classList.contains('hidden');
+      if (isCsvEmpty) {
+        el.csvSection.classList.add('no-print');
+      } else {
+        el.csvSection.classList.remove('no-print');
+      }
+
+      window.print();
+    }
+
+    el.btnPrint.addEventListener('click', triggerPrint);
+    el.btnPrintSingle.addEventListener('click', triggerPrint);
+
+    // ================= CSV Batch Processor Logic =================
+    function parseCsvText(text) {
+      const clean = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      const rows = [];
+      let row = [];
+      let val = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < clean.length; i++) {
+        const ch = clean[i];
+        const next = clean[i + 1];
+        if (inQuotes) {
+          if (ch === '"' && next === '"') {
+            val += '"';
+            i++;
+          } else if (ch === '"') {
+            inQuotes = false;
+          } else {
+            val += ch;
+          }
+        } else {
+          if (ch === '"') {
+            inQuotes = true;
+          } else if (ch === ',') {
+            row.push(val);
+            val = '';
+          } else if (ch === '\n') {
+            row.push(val);
+            rows.push(row);
+            row = [];
+            val = '';
+          } else {
+            val += ch;
+          }
+        }
+      }
+      if (val !== '' || row.length > 0) {
+        row.push(val);
+        rows.push(row);
+      }
+      return rows.filter(r => !(r.length === 1 && r[0].trim() === ''));
+    }
+
+    function normalizeCsvPayment(raw) {
+      const v = String(raw || '').trim().toLowerCase();
+      if (v === 'month' || v === 'monthly' || v === '月付') return 'monthly';
+      if (v === 'quarter' || v === 'quarterly' || v === '季付') return 'quarterly';
+      if (v === 'year' || v === 'annual' || v === '年付') return 'annual';
+      return v;
+    }
+
+    function paymentCodeForExport(freq) {
+      if (freq === 'monthly') return 'month';
+      if (freq === 'quarterly') return 'quarter';
+      if (freq === 'annual') return 'year';
+      return freq;
+    }
+
+    function evaluateCsvRecord(rec) {
+      const errors = [];
+      let statusCode = 'valid';
+
+      const feeStr = String(rec.fee ?? '').trim();
+      const fee = Number(feeStr);
+      if (feeStr === '' || Number.isNaN(fee)) {
+        errors.push('月費不可為空值');
+        if (statusCode === 'valid') statusCode = 'missing_fee';
+      } else if (fee <= 0) {
+        errors.push(`月費無效 (${fee})`);
+        if (statusCode === 'valid') statusCode = 'invalid_fee';
+      }
+
+      const monthsStr = String(rec.months ?? '').trim();
+      const months = Number(monthsStr);
+      if (monthsStr === '') {
+        errors.push('月數不可為空值');
+        if (statusCode === 'valid') statusCode = 'missing_months';
+      } else if (Number.isNaN(months) || !Number.isInteger(months) || ![3, 6, 12].includes(months)) {
+        errors.push(`期間無效 (${monthsStr})`);
+        if (statusCode === 'valid') statusCode = 'invalid_months';
+      }
+
+      const discStr = String(rec.discount ?? '').trim();
+      const disc = Number(discStr);
+      if (discStr === '') {
+        errors.push('折扣不可為空值');
+        if (statusCode === 'valid') statusCode = 'missing_discount';
+      } else if (Number.isNaN(disc) || disc < 0 || disc > 30) {
+        errors.push(`折扣超範圍 (${discStr}%)`);
+        if (statusCode === 'valid') statusCode = 'invalid_discount';
+      }
+
+      const freq = normalizeCsvPayment(rec.payment);
+      if (!['monthly', 'quarterly', 'annual'].includes(freq)) {
+        errors.push(`付款方式無效 (${rec.payment || '空'})`);
+        if (statusCode === 'valid') statusCode = 'invalid_payment';
+      } else if (freq === 'annual' && Number.isInteger(months) && months !== 12) {
+        errors.push('年付限 12 個月');
+        if (statusCode === 'valid') statusCode = 'invalid_year';
+      }
+
+      const taxStr = String(rec.tax ?? '').trim().toLowerCase();
+      let isTaxed = true;
+      if (taxStr === 'false' || taxStr === '0' || taxStr === 'no') {
+        isTaxed = false;
+      } else if (taxStr === 'true' || taxStr === '1' || taxStr === 'yes') {
+        isTaxed = true;
+      } else {
+        errors.push(`含稅欄位無效 (${rec.tax || '空'})`);
+        if (statusCode === 'valid') statusCode = 'invalid_tax';
+      }
+
+      const ceilingStr = String(rec.approved_ceiling ?? '').trim();
+      let ceiling = null;
+      if (ceilingStr !== '') {
+        const cNum = Number(ceilingStr);
+        if (Number.isNaN(cNum) || cNum < 0) {
+          errors.push(`核准上限無效 (${ceilingStr})`);
+          if (statusCode === 'valid') statusCode = 'invalid_ceiling';
+        } else {
+          ceiling = cNum;
+        }
+      }
+
+      if (errors.length > 0) {
+        return {
+          valid: false,
+          statusCode,
+          errors,
+          freq,
+          isTaxed,
+          ceiling,
+          approvalCode: 'not_requested',
+          approvalState: 'neutral',
+        };
+      }
+
+      const base = fee * months;
+      const afterDisc = base * (1 - disc / 100);
+      const afterAnnual = freq === 'annual' ? afterDisc * 0.97 : afterDisc;
+      const preTaxTotal = Math.round(afterAnnual);
+      const taxedTotal = Math.round(afterAnnual * 1.05);
+      const activeTotal = isTaxed ? taxedTotal : preTaxTotal;
+
+      const count = freq === 'monthly' ? months : freq === 'quarterly' ? months / 3 : 1;
+      const baseInst = Math.floor(activeTotal / count);
+      const lastInst = activeTotal - baseInst * (count - 1);
+      const instArr = [];
+      for (let i = 1; i <= count; i++) {
+        instArr.push(i === count ? lastInst : baseInst);
+      }
+
+      let approvalCode = 'not_requested';
+      let approvalState = 'neutral';
+      if (ceiling !== null) {
+        if (activeTotal > ceiling) {
+          approvalCode = `over_by_${activeTotal - ceiling}`;
+          approvalState = 'exceeded';
+        } else {
+          approvalCode = 'within_ceiling';
+          approvalState = 'within';
+        }
+      }
+
+      return {
+        valid: true,
+        statusCode: 'valid',
+        errors: [],
+        freq,
+        isTaxed,
+        ceiling,
+        preTaxTotal,
+        taxedTotal,
+        activeTotal,
+        installmentsPipe: instArr.join('|'),
+        approvalCode,
+        approvalState,
+      };
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function processCsvData(csvText) {
+      el.csvErrorBanner.classList.add('hidden');
+      const rows = parseCsvText(csvText);
+
+      if (rows.length < 2) {
+        el.csvErrorMsg.textContent = 'CSV 檔案至少需包含標題列與一筆資料列。';
+        el.csvErrorBanner.classList.remove('hidden');
+        return;
+      }
+
+      const headers = rows[0].map(h => h.trim().toLowerCase());
+      const required = ['fee', 'months', 'discount', 'payment', 'tax'];
+      const missing = required.filter(col => !headers.includes(col));
+      if (missing.length > 0) {
+        el.csvErrorMsg.textContent = `缺少必要欄位：${missing.join(', ')}`;
+        el.csvErrorBanner.classList.remove('hidden');
+        return;
+      }
+
+      const hasExpected = headers.includes('expected');
+      el.csvRegHeader.classList.toggle('hidden', !hasExpected);
+
+      let validCount = 0;
+      let invalidCount = 0;
+      let exceededCount = 0;
+      let regPass = 0;
+      let regTotal = 0;
+
+      lastBatchExportRows = [];
+      el.csvTbody.innerHTML = '';
+
+      for (let i = 1; i < rows.length; i++) {
+        const cols = rows[i];
+        const rec = {};
+        headers.forEach((h, idx) => {
+          rec[h] = cols[idx] !== undefined ? cols[idx].trim() : '';
+        });
+
+        const caseName = rec.case || `Row-${i}`;
+        const res = evaluateCsvRecord(rec);
+
+        if (res.valid) {
+          validCount++;
+          if (res.approvalState === 'exceeded') exceededCount++;
+        } else {
+          invalidCount++;
+        }
+
+        let regCellHtml = '';
+        if (hasExpected) {
+          regTotal++;
+          const diffs = [];
+          if (rec.expected && rec.expected !== res.statusCode) {
+            diffs.push(`狀態(預期:${rec.expected}, 實際:${res.statusCode})`);
+          }
+          if (res.valid) {
+            if (rec.net && Number(rec.net) !== res.preTaxTotal) {
+              diffs.push(`稅前(預期:${rec.net}, 實際:${res.preTaxTotal})`);
+            }
+            if (rec.total && Number(rec.total) !== res.taxedTotal) {
+              diffs.push(`含稅(預期:${rec.total}, 實際:${res.taxedTotal})`);
+            }
+            if (rec.installments && rec.installments !== res.installmentsPipe) {
+              diffs.push(`分期(預期:${rec.installments}, 實際:${res.installmentsPipe})`);
+            }
+          }
+          if (rec.approval_check && rec.approval_check !== res.approvalCode) {
+            diffs.push(`核准(預期:${rec.approval_check}, 實際:${res.approvalCode})`);
+          }
+
+          if (diffs.length === 0) {
+            regPass++;
+            regCellHtml = `<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800">PASS</span>`;
+          } else {
+            regCellHtml = `<span class="px-2 py-0.5 text-xs font-bold rounded bg-rose-100 text-rose-800">FAIL</span> <span class="text-xs text-rose-700">${escapeHtml(diffs.join('；'))}</span>`;
+          }
+        }
+
+        lastBatchExportRows.push({ caseName, rec, res });
+
+        const freqLabel = res.freq === 'monthly' ? '月付' : res.freq === 'quarterly' ? '季付' : res.freq === 'annual' ? '年付' : escapeHtml(rec.payment || '—');
+
+        const statusBadge = res.valid
+          ? `<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800">valid</span>`
+          : `<span class="px-2 py-0.5 text-xs font-bold rounded bg-rose-100 text-rose-800">${escapeHtml(res.statusCode)}</span><div class="text-[11px] text-rose-600 mt-0.5">${escapeHtml(res.errors.join('、'))}</div>`;
+
+        let approvalBadge = `<span class="px-2 py-0.5 text-xs font-medium rounded bg-slate-100 text-slate-600">not_requested</span>`;
+        if (res.valid) {
+          if (res.approvalState === 'exceeded') {
+            approvalBadge = `<span class="px-2 py-0.5 text-xs font-bold rounded bg-amber-100 text-amber-800">${escapeHtml(res.approvalCode)}</span><div class="text-[11px] text-amber-700 mt-0.5">停止承諾、取得核准</div>`;
+          } else if (res.approvalState === 'within') {
+            approvalBadge = `<span class="px-2 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800">within_ceiling</span><div class="text-[11px] text-emerald-700 mt-0.5">上限內（非正式接受）</div>`;
+          }
+        }
+
+        const tr = document.createElement('tr');
+        let rowBgClass = i % 2 === 0 ? 'bg-slate-100/80 hover:bg-indigo-50/70' : 'bg-white hover:bg-indigo-50/70';
+        if (!res.valid) {
+          rowBgClass = 'bg-rose-50/90 hover:bg-rose-100/80';
+        } else if (res.approvalState === 'exceeded') {
+          rowBgClass = 'bg-amber-50/90 hover:bg-amber-100/80';
+        }
+        tr.className = `cursor-pointer transition-colors ${rowBgClass}`;
+        tr.title = '點擊將此列帶入上方單筆計算機';
+
+        tr.innerHTML = `
+          <td class="py-3 px-3.5 font-bold text-slate-900 whitespace-nowrap">${escapeHtml(caseName)}</td>
+          <td class="py-3 px-3.5 text-right whitespace-nowrap">${rec.fee === '' ? '<span class="text-slate-400 italic">(空)</span>' : Number(rec.fee).toLocaleString('zh-TW')}</td>
+          <td class="py-3 px-3.5 text-right whitespace-nowrap">${rec.months === '' ? '<span class="text-slate-400 italic">(空)</span>' : escapeHtml(rec.months)}</td>
+          <td class="py-3 px-3.5 text-right whitespace-nowrap">${rec.discount === '' ? '<span class="text-slate-400 italic">(空)</span>' : escapeHtml(rec.discount) + '%'}</td>
+          <td class="py-3 px-3.5 whitespace-nowrap">${freqLabel}</td>
+          <td class="py-3 px-3.5 whitespace-nowrap">${res.isTaxed ? '是' : '否'}</td>
+          <td class="py-3 px-3.5">${statusBadge}</td>
+          <td class="py-3 px-3.5 text-right whitespace-nowrap">${res.valid ? res.preTaxTotal.toLocaleString('zh-TW') : '—'}</td>
+          <td class="py-3 px-3.5 text-right font-bold text-slate-900 whitespace-nowrap">${res.valid ? res.taxedTotal.toLocaleString('zh-TW') : '—'}</td>
+          <td class="py-3 px-3.5 text-xs text-slate-600 whitespace-nowrap">${res.valid ? escapeHtml(res.installmentsPipe) : '—'}</td>
+          <td class="py-3 px-3.5 text-right whitespace-nowrap">${res.ceiling !== null ? res.ceiling.toLocaleString('zh-TW') : '—'}</td>
+          <td class="py-3 px-3.5">${approvalBadge}</td>
+          ${hasExpected ? `<td class="py-3 px-3.5">${regCellHtml}</td>` : ''}
+        `;
+
+        tr.addEventListener('click', () => {
+          state.monthlyFee = rec.fee ?? '';
+          state.months = rec.months ?? '';
+          state.discount = rec.discount ?? '';
+          const normFreq = normalizeCsvPayment(rec.payment);
+          if (['monthly', 'quarterly', 'annual'].includes(normFreq)) {
+            state.frequency = normFreq;
+          }
+          state.taxMode = res.isTaxed ? 'taxed' : 'pretax';
+          state.approvalLimit = rec.approved_ceiling ?? '';
+          state.activeCaseId = null;
+          applyStateToInputs();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+
+        el.csvTbody.appendChild(tr);
+      }
+
+      el.csvStatTotal.textContent = `總筆數：${rows.length - 1}`;
+      el.csvStatValid.textContent = `有效報價：${validCount}`;
+      el.csvStatInvalid.textContent = `無效阻擋：${invalidCount}`;
+      el.csvStatExceeded.textContent = `超過上限：${exceededCount}`;
+
+      if (hasExpected) {
+        el.csvStatRegression.classList.remove('hidden');
+        el.csvStatRegression.textContent = `預期比對：${regPass} / ${regTotal} 通過`;
+      } else {
+        el.csvStatRegression.classList.add('hidden');
+      }
+
+      el.csvSummaryBar.classList.remove('hidden');
+      el.csvPlaceholder.classList.add('hidden');
+      el.csvTableWrap.classList.remove('hidden');
+      el.btnExportCsv.disabled = false;
+    }
+
+    el.csvFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (evt) => processCsvData(evt.target.result);
+      reader.onerror = () => {
+        el.csvErrorMsg.textContent = '無法讀取該檔案，請確認是否為有效的 UTF-8 CSV 檔案。';
+        el.csvErrorBanner.classList.remove('hidden');
+      };
+      reader.readAsText(file, 'UTF-8');
+    });
+
+    el.btnLoadSampleCsv.addEventListener('click', () => {
+      processCsvData(BUILTIN_SAMPLE_CSV);
+    });
+
+    el.btnExportCsv.addEventListener('click', () => {
+      if (lastBatchExportRows.length === 0) return;
+      const header = ['case', 'fee', 'months', 'discount', 'payment', 'tax', 'net', 'total', 'installments', 'status', 'approved_ceiling', 'approval_check'];
+      const lines = [header.join(',')];
+      lastBatchExportRows.forEach(({ caseName, rec, res }) => {
+        lines.push([
+          caseName,
+          rec.fee,
+          rec.months,
+          rec.discount,
+          paymentCodeForExport(res.freq),
+          res.isTaxed ? 'TRUE' : 'FALSE',
+          res.valid ? res.preTaxTotal : '',
+          res.valid ? res.taxedTotal : '',
+          res.valid ? res.installmentsPipe : '',
+          res.statusCode,
+          rec.approved_ceiling || '',
+          res.approvalCode,
+        ].join(','));
+      });
+      const blob = new Blob(['\uFEFF' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'quote-batch-results.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // Initialize App
+    initQaGrid();
+    applyStateToInputs();
+  </script>
+</body>
+</html>
